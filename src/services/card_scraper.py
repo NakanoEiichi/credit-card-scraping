@@ -58,11 +58,11 @@ class CardScraper:
     )
     def get_card_urls(self, base_url: str, max_pages: int = 5) -> List[str]:
         """カード詳細ページのURL一覧を取得"""
+        print(f"カードURL一覧の取得中: {base_url}")
         self._ensure_driver()
         detail_urls = []
 
         try:
-            print(f"ページにアクセス: {base_url}")
             self.driver.get(base_url)
             
             # ページの読み込みを待機
@@ -89,7 +89,6 @@ class CardScraper:
                             (By.CSS_SELECTOR, ".p-planSearchList_item")
                         )
                     )
-                    print(f"カードリスト要素を取得: {len(card_list_elements)}件")
 
                     for element in card_list_elements:
                         try:
@@ -99,7 +98,6 @@ class CardScraper:
                             url = link.get_attribute("href")
                             if url:
                                 detail_urls.append(url)
-                                print(f"URLを追加: {url}")
                         except NoSuchElementException:
                             print("リンク要素が見つかりません")
                             continue
@@ -111,7 +109,6 @@ class CardScraper:
                             print("次のページボタンが表示されていません")
                             break
                         next_button.click()
-                        print("次のページに移動")
                         time.sleep(3)  # ページ遷移後の待機
                         self.wait.until(EC.staleness_of(card_list_elements[0]))
                     except (NoSuchElementException, TimeoutException):
@@ -122,7 +119,6 @@ class CardScraper:
                     print(f"ページ処理中にエラーが発生: {str(e)}")
                     break
 
-            print(f"合計URL数: {len(detail_urls)}")
             return detail_urls
 
         except Exception as e:
@@ -141,15 +137,12 @@ class CardScraper:
         self._ensure_driver()
 
         try:
-            print(f"カード詳細ページにアクセス: {url}")
             self.driver.get(url)
             
             # ページの読み込みを待機
             self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "def-tbl1")))
-            print("基本情報テーブルを検出")
 
             kakaku_card_id = url.split("id=")[-1]
-            print(f"カードID: {kakaku_card_id}")
 
             # グレード情報の取得
             grade_element = self.wait.until(
@@ -183,7 +176,6 @@ class CardScraper:
             try:
                 card_data["issuer_id"] = self.db_handler.get_issuer_id(issuer_name)
                 card_data["partner_id"] = self.db_handler.get_partner_id(partner_name)
-                print(f"発行会社ID: {card_data['issuer_id']}, 提携会社ID: {card_data['partner_id']}")
             except Exception as e:
                 print(f"データベース接続エラー: {str(e)}")
                 self.db_handler.reconnect()  # データベース接続を再確立
@@ -202,7 +194,6 @@ class CardScraper:
                     "unionpay": "銀聯（UnionPay）" in brands,
                 }
             )
-            print(f"対応ブランド: {', '.join(brands)}")
 
             # その他の情報
             card_data.update(
@@ -228,10 +219,40 @@ class CardScraper:
                 EC.presence_of_element_located((By.CLASS_NAME, "def-tbl2"))
             )
             rows = point_table.find_elements(By.TAG_NAME, "tr")
+            point_name = rows[0].find_element(By.TAG_NAME, "td").text
+            expires_at = rows[2].find_element(By.TAG_NAME, "td").text
+            point_data = {
+                "point_name": point_name,
+                "expires_at": expires_at,
+            }
+            point_id = self.db_handler.get_point_id(point_data)
+            card_data["point_id"] = point_id
             annual_bonus = rows[11].find_element(By.TAG_NAME, "td").text
             card_data["annual_bonus"] = annual_bonus
-            print(f"年間ボーナス: {annual_bonus}")
 
+            # 追加機能
+            tables = self.driver.find_elements(By.CLASS_NAME, "def-tbl1")
+            if len(tables) > 1:
+                additional_info = tables[1]
+                rows = additional_info.find_elements(By.TAG_NAME, "tr")
+                first_row_th = rows[0].find_element(By.TAG_NAME, "th")
+                if first_row_th.text == "ETCカード":
+                    card_data["etc_card"] = rows[1].find_element(By.TAG_NAME, "td").text
+                    card_data["family_card"] = rows[2].find_element(By.TAG_NAME, "td").text
+                    card_data["electronic_money"] = rows[3].find_element(By.TAG_NAME, "td").text
+                    card_data["electronic_money_charge"] = rows[4].find_element(By.TAG_NAME, "td").text
+                    card_data["electronic_money_point"] = rows[5].find_element(By.TAG_NAME, "td").text
+                    card_data["digital_wallet"] = rows[6].find_element(By.TAG_NAME, "td").text
+                    card_data["code_payment"] = rows[7].find_element(By.TAG_NAME, "td").text
+                    return card_data
+                    
+            card_data["etc_card"] = ""
+            card_data["family_card"] = ""
+            card_data["electronic_money"] = ""
+            card_data["electronic_money_charge"] = ""
+            card_data["electronic_money_point"] = ""
+            card_data["digital_wallet"] = ""
+            card_data["code_payment"] = ""
             return card_data
 
         except Exception as e:
@@ -247,6 +268,7 @@ class CardScraper:
     )
     def scrape_point_rewards(self, card_id: int) -> List[Dict[str, Any]]:
         """ポイント還元情報を取得"""
+        print(f"ポイント還元情報の取得中: {card_id}")
         rewards = []
         try:
             point_tables = self.wait.until(
@@ -281,12 +303,12 @@ class CardScraper:
                     }
                     shop_id = self.db_handler.get_shop_id(shop_data)
 
-                    condition_raw = ""
+                    remarks = ""
                     if len(shop_text) > 1:
-                        condition_number = shop_text[-1].strip()
-                        condition_raw = self.driver.execute_script(
+                        remarks_number = shop_text[-1].strip()
+                        remarks = self.driver.execute_script(
                             "return arguments[0].nextSibling.textContent;",
-                            notes[int(condition_number) - 1],
+                            notes[int(remarks_number) - 1],
                         ).strip()
 
                     td = row.find_element(By.XPATH, ".//td")
@@ -302,7 +324,8 @@ class CardScraper:
                             "shop_id": shop_id,
                             "spending_amount": amount,
                             "points": points,
-                            "condition_raw": condition_raw,
+                            "remarks": remarks,
+                            "from_kakaku": True,
                         }
                     )
                 except Exception as e:
@@ -316,6 +339,171 @@ class CardScraper:
             self._init_driver()
             self._init_wait()
             raise e
+
+    @retry(
+        retry=retry_if_exception_type((WebDriverException, TimeoutException, StaleElementReferenceException)),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def scrape_point_exchange(self, card_id: int) -> List[Dict[str, Any]]:
+        """ポイント交換情報を取得"""
+        print(f"ポイント交換情報の取得中: {card_id}")
+        exchanges = []
+        try:
+            point_tables = self.wait.until(
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR, ".p-rateTbl.p-rateTbl-type2.p-rateTbl01.s-highlightTbl")
+                )
+            )
+
+            if not point_tables:
+                return exchanges
+
+            table = point_tables[0]
+            first_header = table.find_element(By.TAG_NAME, "thead").find_elements(By.TAG_NAME, "tr")[0]
+            second_header = table.find_element(By.TAG_NAME, "thead").find_elements(By.TAG_NAME, "tr")[1]
+            third_header = table.find_element(By.TAG_NAME, "thead").find_elements(By.TAG_NAME, "tr")[2]
+            notes = self.driver.find_elements(By.CLASS_NAME, "p-rateNotes_label")
+
+            category_elements = first_header.find_elements(By.CSS_SELECTOR, "th:not(.fixCol)")
+            max_th_index = 0
+            th_index = 0
+            for category_element in category_elements:
+                category = category_element.text
+                max_th_index += int(category_element.get_attribute("colspan"))
+                
+                while th_index < max_th_index:
+                    reward_name_text = second_header.find_elements(By.TAG_NAME, "th")[th_index].text.split("※")
+                    reward_name = reward_name_text[0]
+                    remarks = ""
+                    if len(reward_name_text) > 1:
+                        remarks_number = reward_name_text[-1].strip()
+                        remarks = self.driver.execute_script(
+                            "return arguments[0].nextSibling.textContent;",
+                            notes[int(remarks_number) - 1],
+                        ).strip()
+                    exchange_rate_str = third_header.find_elements(By.TAG_NAME, "th")[th_index].text.replace(',', '')
+                    pattern = r'(\d+)([a-zA-Z\u4e00-\u9fff]+)→(\d+)([a-zA-Z\u4e00-\u9fff]+)'
+                    match = re.match(pattern, exchange_rate_str)
+                    th_index += 1
+                    if match:
+                        before_value = int(match.group(1))
+                        after_value = int(match.group(3))
+                        after_unit = match.group(4)
+                        reward = {
+                            "category": category,
+                            "reward_name": reward_name,
+                            "unit": after_unit,
+                        }
+                        reward_id = self.db_handler.get_reward_id(reward)
+
+                        exchanges.append({
+                            "card_id": card_id,
+                            "exchangeable_reward_id": reward_id,
+                            "before_value": before_value,
+                            "after_value": after_value,
+                            "remarks": remarks,
+                        })
+                    else:
+                        raise ValueError(f"Invalid exchange rate format: {exchange_rate_str}")
+                    
+            return exchanges
+        except Exception as e:
+            print(f"ポイント交換情報の取得中にエラーが発生: {str(e)}")
+            self._init_driver()
+            self._init_wait()
+            raise e
+    
+    def scrape_include_insurance(self, card_id: int):
+        """付帯保険情報を取得"""
+        print(f"付帯保険情報の取得中: {card_id}")
+        try:
+            tables = self.driver.find_elements(By.CLASS_NAME, "def-tbl2")
+            if len(tables) < 2:
+                print(f"カードID {card_id} の付帯保険情報テーブルが見つかりません")
+                return
+            insurance_table = tables[-1]
+            
+            rows = insurance_table.find_elements(By.TAG_NAME, "tr")
+            category = ""
+            for row in rows:
+                # th要素で、かつbd-cell2クラスを持つものを探す
+                try:
+                    category_th = row.find_element(By.CSS_SELECTOR, "th.bd-cell2")
+                    category = category_th.text
+                except NoSuchElementException:
+                    pass
+                
+                # th要素で、かつbd-cell2クラスを持っていないものを探す
+                coverage_type_th = row.find_element(By.CSS_SELECTOR, "th:not(.bd-cell2)")
+                coverage_type = coverage_type_th.text
+                if coverage_type == "備考":
+                    continue
+
+                coverage_amount = row.find_element(By.TAG_NAME, "td").text
+                if coverage_amount == "-":
+                    continue
+                
+                include_insurance_data = {
+                    "card_id": card_id,
+                    "category": category,
+                    "coverage_type": coverage_type,
+                    "coverage_amount": coverage_amount,
+                    "remarks": "",
+                }
+                self.db_handler.upsert_include_insurance(include_insurance_data)
+
+        except Exception as e:
+            print(f"付帯保険情報の取得中にエラーが発生: {str(e)}")
+            self._init_driver()
+            self._init_wait()
+            raise e
+
+    def scrape_include_services(self, card_id: int):
+        """付帯サービス情報を取得"""
+        print(f"付帯サービス情報の取得中: {card_id}")
+        try:
+            tables = self.driver.find_elements(By.CLASS_NAME, "def-tbl1")
+            if len(tables) < 3:
+                print(f"カードID {card_id} の付帯サービス情報テーブルが見つかりません")
+                return
+            
+            service_table = tables[2]
+            rows = service_table.find_elements(By.TAG_NAME, "tr")
+            for row in rows:
+                service_name = row.find_element(By.TAG_NAME, "th").text
+                service_content = row.find_element(By.TAG_NAME, "td").text
+                
+                include_service_data = {
+                    "card_id": card_id,
+                    "service_name": service_name,
+                    "service_content": service_content,
+                    "remarks": "",
+                }
+                self.db_handler.upsert_include_service(include_service_data)
+
+        except Exception as e:
+            print(f"付帯サービス情報の取得中にエラーが発生: {str(e)}")
+            self._init_driver()
+            self._init_wait()
+            raise e
+        
+    def scrape_point_info(self, card_id: int):
+        """ポイント情報を取得"""
+        print(f"ポイント情報の取得中: {card_id}")
+        try:
+            point_table = self.driver.find_element(By.CLASS_NAME, "def-tbl2")
+            rows = point_table.find_elements(By.TAG_NAME, "tr")
+            point_name = rows[0].find_element(By.TAG_NAME, "td").text
+            expires_at = rows[2].find_element(By.TAG_NAME, "td").text
+            point_info = {
+                "point_name": point_name,
+                "expires_at": expires_at,
+            }
+            self.db_handler.upsert_point(point_info)
+
+        except Exception as e:
+            print(f"ポイント情報の取得中にエラーが発生: {str(e)}")
 
     def close(self):
         """ドライバーを終了"""

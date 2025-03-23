@@ -48,4 +48,9 @@ logs/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Credentials
+credentials.json
+creadentials.json
+src/credentials.json 
