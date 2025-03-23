@@ -1,0 +1,12 @@
+selenium
+jupyter
+requests
+BeautifulSoup4
+gspread
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+mysql-connector-python
+tenacity
+python-dotenv

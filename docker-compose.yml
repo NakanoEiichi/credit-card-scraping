@@ -1,0 +1,56 @@
+# version: "3"
+services:
+  selenium:
+    image: selenium/standalone-chrome:4.1.4-20220427
+    ports:
+      - 4444:4444
+      - 7900:7900
+    volumes:
+      - /dev/shm:/dev/shm
+    networks:
+      - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4444/wd/hub/status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - 3306:3306
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - app-network
+
+  app:
+    build: .
+    depends_on:
+      selenium:
+        condition: service_healthy
+      mysql:
+        condition: service_started
+    volumes:
+      - ./src:/src
+      - ./setup.py:/setup.py
+      - ./credentials.json:/src/credentials.json
+    env_file:
+      - .env
+    networks:
+      - app-network
+    tty: true
+    stdin_open: true
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
