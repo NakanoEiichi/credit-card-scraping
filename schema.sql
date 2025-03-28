@@ -1,3 +1,4 @@
+-- 基本テーブル（外部キー制約なし）
 -- issuers table
 CREATE TABLE IF NOT EXISTS issuers (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -33,6 +34,17 @@ CREATE TABLE IF NOT EXISTS shops (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+-- exchangeable_rewards table
+CREATE TABLE IF NOT EXISTS exchangeable_rewards (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(255) NOT NULL,
+    reward_name VARCHAR(255) NOT NULL,
+    unit VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- カード関連テーブル（issuers, partners, pointsを参照）
 -- cards table
 CREATE TABLE IF NOT EXISTS cards (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -76,6 +88,7 @@ CREATE TABLE IF NOT EXISTS cards (
     FOREIGN KEY (point_id) REFERENCES points(id)
 );
 
+-- ポイント報酬関連テーブル（cards, shopsを参照）
 -- point_rewards table
 CREATE TABLE IF NOT EXISTS point_rewards (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,6 +105,19 @@ CREATE TABLE IF NOT EXISTS point_rewards (
     UNIQUE KEY unique_point_reward (card_id, shop_id, from_kakaku)
 );
 
+-- point_reward_conditions table
+CREATE TABLE IF NOT EXISTS point_reward_conditions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    point_reward_id INT NOT NULL,
+    condition_type ENUM('date', 'brand', 'amount') NOT NULL,
+    condition_value VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (point_reward_id) REFERENCES point_rewards(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_condition (point_reward_id, condition_type, condition_value)
+);
+
+-- 割引報酬関連テーブル（cards, shopsを参照）
 -- discount_rewards table
 CREATE TABLE IF NOT EXISTS discount_rewards (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -107,28 +133,7 @@ CREATE TABLE IF NOT EXISTS discount_rewards (
     UNIQUE KEY unique_discount_reward (card_id, shop_id)
 );
 
--- point_reward_conditions table
-CREATE TABLE IF NOT EXISTS point_reward_conditions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    point_reward_id INT NOT NULL,
-    condition_type ENUM('date', 'brand', 'amount') NOT NULL,
-    condition_value VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (point_reward_id) REFERENCES point_rewards(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_condition (point_reward_id, condition_type, condition_value)
-); 
-
--- exchangeable_rewards table
-CREATE TABLE IF NOT EXISTS exchangeable_rewards (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    category VARCHAR(255) NOT NULL,
-    reward_name VARCHAR(255) NOT NULL,
-    unit VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-);
-
+-- ポイント交換関連テーブル（cards, exchangeable_rewardsを参照）
 -- point_exchanges table
 CREATE TABLE IF NOT EXISTS point_exchanges (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -143,6 +148,7 @@ CREATE TABLE IF NOT EXISTS point_exchanges (
     FOREIGN KEY (exchangeable_reward_id) REFERENCES exchangeable_rewards(id)
 );
 
+-- 保険関連テーブル（cardsを参照）
 -- include_insurance table
 CREATE TABLE IF NOT EXISTS include_insurances (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -157,6 +163,7 @@ CREATE TABLE IF NOT EXISTS include_insurances (
     UNIQUE KEY unique_include_insurance (card_id, category, coverage_type)
 );
 
+-- サービス関連テーブル（cardsを参照）
 -- include_services table
 CREATE TABLE IF NOT EXISTS include_services (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -170,6 +177,7 @@ CREATE TABLE IF NOT EXISTS include_services (
     UNIQUE KEY unique_include_service (card_id, service_name)
 );
 
+-- ショップドメイン関連テーブル（shopsを参照）
 -- shop_domains table
 CREATE TABLE IF NOT EXISTS shop_domains (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -180,6 +188,7 @@ CREATE TABLE IF NOT EXISTS shop_domains (
     FOREIGN KEY (shop_id) REFERENCES shops(id)
 );
 
+-- 年間ボーナス関連テーブル（cardsを参照）
 -- annual_bonus table
 CREATE TABLE IF NOT EXISTS annual_bonuses (
     id INT AUTO_INCREMENT PRIMARY KEY,
