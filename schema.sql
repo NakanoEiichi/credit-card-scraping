@@ -120,6 +120,8 @@ CREATE TABLE IF NOT EXISTS point_rewards (
     given_points INT NOT NULL COMMENT '付与ポイント',
     remarks TEXT COMMENT '備考',
     evidence TEXT,
+    is_checked BOOLEAN,
+    is_completed BOOLEAN,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
