@@ -1,6 +1,6 @@
 -- 基本テーブル（外部キー制約なし）
 -- issuers table
-CREATE TABLE IF NOT EXISTS issuers (
+CREATE TABLE IF NOT EXISTS m_issuers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     issuer_name VARCHAR(255) NOT NULL UNIQUE COMMENT '発行会社名',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS issuers (
 );
 
 -- points table
-CREATE TABLE IF NOT EXISTS points (
+CREATE TABLE IF NOT EXISTS m_points (
     id INT AUTO_INCREMENT PRIMARY KEY,
     point_name VARCHAR(255) NOT NULL UNIQUE COMMENT 'ポイント名',
     expiration VARCHAR(255) COMMENT '有効期限',
@@ -32,19 +32,20 @@ CREATE TABLE IF NOT EXISTS shops (
 );
 
 -- exchangeable_rewards table
-CREATE TABLE IF NOT EXISTS exchangeable_rewards (
+CREATE TABLE IF NOT EXISTS m_exchangeable_rewards (
     id INT AUTO_INCREMENT PRIMARY KEY,
     category VARCHAR(255) NOT NULL COMMENT 'リワードカテゴリ',
-    reward_name VARCHAR(255) NOT NULL UNIQUE COMMENT 'リワード名',
+    reward_name VARCHAR(255) NOT NULL COMMENT 'リワード名',
     unit VARCHAR(255) NOT NULL COMMENT '単位',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP NULL
+    deleted_at TIMESTAMP NULL,
+    UNIQUE KEY unique_exchangeable_reward (category, reward_name)
 );
 
 -- レコメンドタグマスタテーブル
 -- recommend_tags table
-CREATE TABLE IF NOT EXISTS recommend_tags (
+CREATE TABLE IF NOT EXISTS m_recommend_tags (
     id INT AUTO_INCREMENT PRIMARY KEY,
     tag_name VARCHAR(100) NOT NULL UNIQUE COMMENT 'タグ名',
     tag_category VARCHAR(50) NOT NULL COMMENT 'タグカテゴリ',
@@ -93,8 +94,8 @@ CREATE TABLE IF NOT EXISTS cards (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
-    FOREIGN KEY (issuer_id) REFERENCES issuers(id),
-    FOREIGN KEY (point_id) REFERENCES points(id)
+    FOREIGN KEY (issuer_id) REFERENCES m_issuers(id),
+    FOREIGN KEY (point_id) REFERENCES m_points(id)
 );
 
 -- カードとレコメンドタグの関連テーブル
@@ -107,7 +108,7 @@ CREATE TABLE IF NOT EXISTS card_recommend_tags (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (card_id) REFERENCES cards(id),
-    FOREIGN KEY (recommend_tag_id) REFERENCES recommend_tags(id)
+    FOREIGN KEY (recommend_tag_id) REFERENCES m_recommend_tags(id)
 );
 
 -- ポイント報酬関連テーブル（cards, shopsを参照）
@@ -182,13 +183,13 @@ CREATE TABLE IF NOT EXISTS point_exchanges (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (card_id) REFERENCES cards(id),
-    FOREIGN KEY (exchangeable_reward_id) REFERENCES exchangeable_rewards(id),
+    FOREIGN KEY (exchangeable_reward_id) REFERENCES m_exchangeable_rewards(id),
     UNIQUE KEY unique_point_exchange (card_id, exchangeable_reward_id)
 );
 
 -- 付帯保険関連テーブル（cardsを参照）
 -- include_insurance table
-CREATE TABLE IF NOT EXISTS include_insurances (
+CREATE TABLE IF NOT EXISTS card_include_insurances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     card_id INT NOT NULL,
     category VARCHAR(255) NOT NULL COMMENT 'カテゴリ',
@@ -204,7 +205,7 @@ CREATE TABLE IF NOT EXISTS include_insurances (
 
 -- 付帯サービス関連テーブル（cardsを参照）
 -- include_services table
-CREATE TABLE IF NOT EXISTS include_services (
+CREATE TABLE IF NOT EXISTS card_include_services (
     id INT AUTO_INCREMENT PRIMARY KEY,
     card_id INT NOT NULL,
     service_name VARCHAR(255) NOT NULL COMMENT 'サービス名',
@@ -233,7 +234,7 @@ CREATE TABLE IF NOT EXISTS shop_domains (
 
 -- 年間ボーナス関連テーブル（cardsを参照）
 -- annual_bonus table
-CREATE TABLE IF NOT EXISTS annual_bonuses (
+CREATE TABLE IF NOT EXISTS card_annual_bonuses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     card_id INT NOT NULL,
     spending_amount INT NOT NULL COMMENT '利用金額',
