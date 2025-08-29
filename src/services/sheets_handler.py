@@ -10,9 +10,9 @@ load_dotenv()
 class SheetsHandler:
     def __init__(self):
         self.spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID")
-        self.credentials = self._get_credentials()
-        self.service = build("sheets", "v4", credentials=self.credentials)
-        self._init_sheets()
+        # self.credentials = self._get_credentials()
+        # self.service = build("sheets", "v4", credentials=self.credentials)
+        # self._init_sheets()
 
     def _get_credentials(self) -> Credentials:
         """認証情報を取得"""

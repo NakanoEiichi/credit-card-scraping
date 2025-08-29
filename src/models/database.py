@@ -55,12 +55,12 @@ class DatabaseHandler:
         self._ensure_connection()
         try:
             cursor = self.connection.cursor()
-            cursor.execute("SELECT id FROM issuers WHERE issuer_name = %s", (name,))
+            cursor.execute("SELECT id FROM m_issuers WHERE issuer_name = %s", (name,))
             result = cursor.fetchone()
             if result:
                 return result[0]
             else:
-                cursor.execute("INSERT INTO issuers (issuer_name) VALUES (%s)", (name,))
+                cursor.execute("INSERT INTO m_issuers (issuer_name) VALUES (%s)", (name,))
                 self.connection.commit()
                 return cursor.lastrowid
         except Error as e:
@@ -73,12 +73,12 @@ class DatabaseHandler:
         self._ensure_connection()
         try:
             cursor = self.connection.cursor()
-            cursor.execute("SELECT id FROM partners WHERE partner_name = %s", (name,))
+            cursor.execute("SELECT id FROM m_partners WHERE partner_name = %s", (name,))
             result = cursor.fetchone()
             if result:
                 return result[0]
             else:
-                cursor.execute("INSERT INTO partners (partner_name) VALUES (%s)", (name,))
+                cursor.execute("INSERT INTO m_partners (partner_name) VALUES (%s)", (name,))
                 self.connection.commit()
                 return cursor.lastrowid
         except Error as e:
@@ -111,7 +111,7 @@ class DatabaseHandler:
             if result:
                 return result[0]
             else:
-                cursor.execute("INSERT INTO shops (shop_name, is_online, category) VALUES (%s, %s, %s)", (shop_data["shop_name"], shop_data["is_online"], shop_data["category"]))
+                cursor.execute("INSERT INTO shops (shop_name, is_online, category, created_by) VALUES (%s, %s, %s, %s)", (shop_data["shop_name"], shop_data["is_online"], shop_data["category"], "batch"))
                 self.connection.commit()
                 return cursor.lastrowid
         except Error as e:
@@ -124,12 +124,12 @@ class DatabaseHandler:
         self._ensure_connection()
         try:
             cursor = self.connection.cursor()
-            cursor.execute("SELECT id FROM exchangeable_rewards WHERE category = %s AND reward_name = %s AND unit = %s", (reward_data["category"], reward_data["reward_name"], reward_data["unit"]))
+            cursor.execute("SELECT id FROM m_exchangeable_rewards WHERE category = %s AND reward_name = %s AND unit = %s", (reward_data["category"], reward_data["reward_name"], reward_data["unit"]))
             result = cursor.fetchone()
             if result:
                 return result[0]
             else:
-                cursor.execute("INSERT INTO exchangeable_rewards (category, reward_name, unit) VALUES (%s, %s, %s)", (reward_data["category"], reward_data["reward_name"], reward_data["unit"]))
+                cursor.execute("INSERT INTO m_exchangeable_rewards (category, reward_name, unit) VALUES (%s, %s, %s)", (reward_data["category"], reward_data["reward_name"], reward_data["unit"]))
                 self.connection.commit()
                 return cursor.lastrowid
         except Error as e:
@@ -145,16 +145,16 @@ class DatabaseHandler:
             cursor.execute(
                 """
                 INSERT INTO cards (
-                    kakaku_card_id, card_name, official_url, grade, issuer_id, partner_id, point_id,
+                    kakaku_card_id, card_name, official_url, grade, issuer_id, point_id,
                     visa, mastercard, jcb, amex, diners, unionpay,
                     eligibility, application_method, screening_period,
-                    annual_fee, shopping_limit, cashing_limit,
+                    annual_fee_raw, shopping_limit, cashing_limit,
                     revolving_interest_rate, cashing_interest_rate,
-                    payment_methods, closing_date, remarks, annual_bonus,
+                    payment_methods, closing_date, remarks, annual_bonus_raw,
                     etc_card, family_card, electronic_money, electronic_money_charge,
                     electronic_money_point, digital_wallet, code_payment
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s
                 ) ON DUPLICATE KEY UPDATE
@@ -162,7 +162,6 @@ class DatabaseHandler:
                     official_url = VALUES(official_url),
                     grade = VALUES(grade),
                     issuer_id = VALUES(issuer_id),
-                    partner_id = VALUES(partner_id),
                     point_id = VALUES(point_id),
                     visa = VALUES(visa),
                     mastercard = VALUES(mastercard),
@@ -173,7 +172,7 @@ class DatabaseHandler:
                     eligibility = VALUES(eligibility),
                     application_method = VALUES(application_method),
                     screening_period = VALUES(screening_period),
-                    annual_fee = VALUES(annual_fee),
+                    annual_fee_raw = VALUES(annual_fee_raw),
                     shopping_limit = VALUES(shopping_limit),
                     cashing_limit = VALUES(cashing_limit),
                     revolving_interest_rate = VALUES(revolving_interest_rate),
@@ -181,7 +180,7 @@ class DatabaseHandler:
                     payment_methods = VALUES(payment_methods),
                     closing_date = VALUES(closing_date),
                     remarks = VALUES(remarks),
-                    annual_bonus = VALUES(annual_bonus),
+                    annual_bonus_raw = VALUES(annual_bonus_raw),
                     etc_card = VALUES(etc_card),
                     family_card = VALUES(family_card),
                     electronic_money = VALUES(electronic_money),
@@ -196,7 +195,6 @@ class DatabaseHandler:
                     card_data["official_url"],
                     card_data["grade"],
                     card_data["issuer_id"],
-                    card_data["partner_id"],
                     card_data["point_id"],
                     card_data["visa"],
                     card_data["mastercard"],
@@ -207,7 +205,7 @@ class DatabaseHandler:
                     card_data["eligibility"],
                     card_data["application_method"],
                     card_data["screening_period"],
-                    card_data["annual_fee"],
+                    card_data["annual_fee_raw"],
                     card_data["shopping_limit"],
                     card_data["cashing_limit"],
                     card_data["revolving_interest_rate"],
@@ -215,7 +213,7 @@ class DatabaseHandler:
                     card_data["payment_methods"],
                     card_data["closing_date"],
                     card_data["remarks"],
-                    card_data["annual_bonus"],
+                    card_data["annual_bonus_raw"],
                     card_data["etc_card"],
                     card_data["family_card"],
                     card_data["electronic_money"],
@@ -244,11 +242,11 @@ class DatabaseHandler:
             cursor.execute(
                 """
                 INSERT INTO point_rewards (
-                    card_id, shop_id, spending_amount, points, remarks, from_kakaku
+                    card_id, shop_id, spending_amount, given_points, remarks, from_kakaku
                 ) VALUES (%s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     spending_amount = VALUES(spending_amount),
-                    points = VALUES(points),
+                    given_points = VALUES(given_points),
                     remarks = VALUES(remarks),
                     from_kakaku = VALUES(from_kakaku)
                 """,
@@ -256,7 +254,7 @@ class DatabaseHandler:
                     point_reward_data["card_id"],
                     point_reward_data["shop_id"],
                     point_reward_data["spending_amount"],
-                    point_reward_data["points"],
+                    point_reward_data["given_points"],
                     point_reward_data["remarks"],
                     point_reward_data["from_kakaku"]
                 ),
@@ -301,7 +299,7 @@ class DatabaseHandler:
             cursor = self.connection.cursor()
             cursor.execute(
                 """
-                INSERT INTO include_insurances (
+                INSERT INTO card_include_insurances (
                     card_id, category, coverage_type, coverage_amount, remarks
                 ) VALUES (%s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
@@ -329,7 +327,7 @@ class DatabaseHandler:
             cursor = self.connection.cursor()
             cursor.execute(
                 """
-                INSERT INTO include_services (
+                INSERT INTO card_include_services (
                     card_id, service_name, service_content, remarks
                 ) VALUES (%s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
@@ -354,12 +352,12 @@ class DatabaseHandler:
         self._ensure_connection()
         try:
             cursor = self.connection.cursor()
-            cursor.execute("SELECT id FROM points WHERE point_name = %s", (point_data["point_name"],))
+            cursor.execute("SELECT id FROM m_points WHERE point_name = %s", (point_data["point_name"],))
             result = cursor.fetchone()
             if result:
                 return result[0]
             else:
-                cursor.execute("INSERT INTO points (point_name, expires_at) VALUES (%s, %s)", (point_data["point_name"], point_data["expires_at"]))
+                cursor.execute("INSERT INTO m_points (point_name, expiration) VALUES (%s, %s)", (point_data["point_name"], point_data["expiration"]))
                 self.connection.commit()
                 return cursor.lastrowid
         except Error as e:
@@ -423,7 +421,7 @@ class DatabaseHandler:
             cursor.execute(
                 """
                 INSERT INTO point_rewards (
-                    card_id, category, shop, spending_amount, points, remarks
+                    card_id, category, shop, spending_amount, given_points, remarks
                 ) VALUES (%s, %s, %s, %s, %s, %s)
                 """,
                 (
@@ -431,7 +429,7 @@ class DatabaseHandler:
                     reward_data["category"],
                     reward_data["shop"],
                     reward_data["spending_amount"],
-                    reward_data["points"],
+                    reward_data["given_points"],
                     reward_data["remarks"],
                 ),
             )

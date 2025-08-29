@@ -25,9 +25,9 @@ def main():
                 card_id = db_handler.upsert_card(card_data)
 
                 # # ポイント還元情報の取得と保存
-                rewards = scraper.scrape_point_rewards(card_id)
-                for reward in rewards:
-                    db_handler.upsert_point_reward(reward)
+                # rewards = scraper.scrape_point_rewards(card_id)
+                # for reward in rewards:
+                #     db_handler.upsert_point_reward(reward)
 
                 # ポイント交換情報の取得と保存
                 exchanges = scraper.scrape_point_exchange(card_id)

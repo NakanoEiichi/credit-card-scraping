@@ -151,19 +151,19 @@ class CardScraper:
             grade = grade_element.text.replace("カードランキング", "")
 
             # 基本情報テーブルの取得
-            base_info = self.wait.until(
-                EC.presence_of_element_located((By.CLASS_NAME, "def-tbl1"))
-            )
-            rows = base_info.find_elements(By.TAG_NAME, "tr")
+            base_info = self.driver.find_elements(By.CLASS_NAME, "def-tbl1")
+            rows = base_info[1].find_elements(By.TAG_NAME, "tr")
+            official_url_element = rows[1].find_element(By.TAG_NAME, "td").find_elements(By.TAG_NAME, "a")
+            if len(official_url_element) > 0:
+                official_url = official_url_element[0].get_attribute("href")
+            else:
+                official_url = ""
 
             # 基本情報の取得
             card_data = {
                 "kakaku_card_id": kakaku_card_id,
                 "card_name": rows[0].find_element(By.TAG_NAME, "td").text,
-                "official_url": rows[1]
-                .find_element(By.TAG_NAME, "td")
-                .find_element(By.TAG_NAME, "a")
-                .get_attribute("href"),
+                "official_url": official_url,
                 "grade": grade,
             }
             print(f"カード名: {card_data['card_name']}")
@@ -175,12 +175,12 @@ class CardScraper:
             # データベース接続を確認し、必要に応じて再接続
             try:
                 card_data["issuer_id"] = self.db_handler.get_issuer_id(issuer_name)
-                card_data["partner_id"] = self.db_handler.get_partner_id(partner_name)
+                # card_data["partner_id"] = self.db_handler.get_partner_id(partner_name)
             except Exception as e:
                 print(f"データベース接続エラー: {str(e)}")
                 self.db_handler.reconnect()  # データベース接続を再確立
                 card_data["issuer_id"] = self.db_handler.get_issuer_id(issuer_name)
-                card_data["partner_id"] = self.db_handler.get_partner_id(partner_name)
+                # card_data["partner_id"] = self.db_handler.get_partner_id(partner_name)
 
             # ブランド情報の処理
             brands = rows[4].find_element(By.TAG_NAME, "td").text.split("、")
@@ -201,7 +201,7 @@ class CardScraper:
                     "eligibility": rows[5].find_element(By.TAG_NAME, "td").text,
                     "application_method": rows[6].find_element(By.TAG_NAME, "td").text,
                     "screening_period": rows[7].find_element(By.TAG_NAME, "td").text,
-                    "annual_fee": rows[8].find_element(By.TAG_NAME, "td").text,
+                    "annual_fee_raw": rows[8].find_element(By.TAG_NAME, "td").text,
                     "shopping_limit": rows[9].find_element(By.TAG_NAME, "td").text,
                     "cashing_limit": rows[10].find_element(By.TAG_NAME, "td").text,
                     "revolving_interest_rate": rows[11]
@@ -220,20 +220,20 @@ class CardScraper:
             )
             rows = point_table.find_elements(By.TAG_NAME, "tr")
             point_name = rows[0].find_element(By.TAG_NAME, "td").text
-            expires_at = rows[2].find_element(By.TAG_NAME, "td").text
+            expiration = rows[2].find_element(By.TAG_NAME, "td").text
             point_data = {
                 "point_name": point_name,
-                "expires_at": expires_at,
+                "expiration": expiration,
             }
             point_id = self.db_handler.get_point_id(point_data)
             card_data["point_id"] = point_id
-            annual_bonus = rows[11].find_element(By.TAG_NAME, "td").text
-            card_data["annual_bonus"] = annual_bonus
+            annual_bonus_raw = rows[11].find_element(By.TAG_NAME, "td").text
+            card_data["annual_bonus_raw"] = annual_bonus_raw
 
             # 追加機能
             tables = self.driver.find_elements(By.CLASS_NAME, "def-tbl1")
-            if len(tables) > 1:
-                additional_info = tables[1]
+            if len(tables) > 2:
+                additional_info = tables[2]
                 rows = additional_info.find_elements(By.TAG_NAME, "tr")
                 first_row_th = rows[0].find_element(By.TAG_NAME, "th")
                 if first_row_th.text == "ETCカード":
@@ -316,14 +316,14 @@ class CardScraper:
                     numbers = re.findall(r"\d+,?\d*", rewards_text)
 
                     amount = int(numbers[0].replace(",", ""))
-                    points = int(numbers[1])
+                    given_points = int(numbers[1])
 
                     rewards.append(
                         {
                             "card_id": card_id,
                             "shop_id": shop_id,
                             "spending_amount": amount,
-                            "points": points,
+                            "given_points": given_points,
                             "remarks": remarks,
                             "from_kakaku": True,
                         }
@@ -464,11 +464,11 @@ class CardScraper:
         print(f"付帯サービス情報の取得中: {card_id}")
         try:
             tables = self.driver.find_elements(By.CLASS_NAME, "def-tbl1")
-            if len(tables) < 3:
+            if len(tables) < 4:
                 print(f"カードID {card_id} の付帯サービス情報テーブルが見つかりません")
                 return
             
-            service_table = tables[2]
+            service_table = tables[3]
             rows = service_table.find_elements(By.TAG_NAME, "tr")
             for row in rows:
                 service_name = row.find_element(By.TAG_NAME, "th").text
@@ -495,10 +495,10 @@ class CardScraper:
             point_table = self.driver.find_element(By.CLASS_NAME, "def-tbl2")
             rows = point_table.find_elements(By.TAG_NAME, "tr")
             point_name = rows[0].find_element(By.TAG_NAME, "td").text
-            expires_at = rows[2].find_element(By.TAG_NAME, "td").text
+            expiration = rows[2].find_element(By.TAG_NAME, "td").text
             point_info = {
                 "point_name": point_name,
-                "expires_at": expires_at,
+                "expiration": expiration,
             }
             self.db_handler.upsert_point(point_info)
 
